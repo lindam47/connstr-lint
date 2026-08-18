@@ -1,0 +1,22 @@
+{
+  "name": "connstr-lint",
+  "version": "0.1.0",
+  "description": "CLI linter for connection strings that reports errors with exact line and column positions",
+  "license": "MIT",
+  "author": "lindam47",
+  "type": "module",
+  "bin": {
+    "connstr-lint": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/cli.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "@types/node": "^20.14.9"
+  }
+}
