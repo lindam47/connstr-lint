@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs"
 import { parseConnectionString } from "./parser.js"
+import { parseUriConnectionString } from "./uri-parser.js"
 import { renderIssue } from "./format.js"
 
 const USAGE =
   "usage: connstr-lint <connection-string>\n" +
   '       echo "$CONN" | connstr-lint\n' +
   "       connstr-lint --json <connection-string>\n"
+
+const URI_SCHEME = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//
 
 function readInput(argv: string[]): string | undefined {
   const positional = argv.find((arg) => !arg.startsWith("-"))
@@ -27,7 +30,8 @@ function main(): number {
     return 2
   }
 
-  const { pairs, issues } = parseConnectionString(input)
+  const isUri = URI_SCHEME.test(input)
+  const { pairs, issues } = isUri ? parseUriConnectionString(input) : parseConnectionString(input)
   const errorCount = issues.filter((issue) => issue.severity === "error").length
 
   if (asJson) {
@@ -43,10 +47,11 @@ function main(): number {
 
   if (errorCount === 0) {
     const keys = pairs.map((pair) => pair.key).join(", ")
+    const noun = isUri ? "component" : "key"
     process.stdout.write(
       pairs.length > 0
-        ? `ok: ${pairs.length} key(s) parsed (${keys})\n`
-        : "ok: no keys found\n",
+        ? `ok: ${pairs.length} ${noun}(s) parsed (${keys})\n`
+        : `ok: no ${noun}s found\n`,
     )
   } else {
     process.stdout.write(`${errorCount} error(s) found\n`)

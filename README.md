@@ -17,7 +17,7 @@ part and connect with a default you didn't ask for.
 `connstr-lint` parses the string itself, independent of any driver, and
 tells you precisely what's wrong and where.
 
-## supported dialect
+## supported dialects
 
 The semicolon-delimited `key=value` format used by ADO.NET, ODBC, OLE DB,
 and most database client libraries (SQL Server, Npgsql, MySqlConnector, and
@@ -36,8 +36,28 @@ Rules it understands:
 - A doubled `==` inside a key escapes a literal `=` in the key name.
 - Keys are matched case-insensitively for duplicate detection.
 
-URI-style connection strings (`postgres://user:pass@host/db`) are a
-different grammar and aren't handled yet - see roadmap below.
+URI-style connection strings are also understood, using whichever scheme
+the string starts with to pick the grammar:
+
+```
+postgres://user:pass@host:5432/dbname?sslmode=require
+mongodb://host1,host2,host3/dbname
+mysql://user@127.0.0.1:3306/dbname
+```
+
+Rules it understands for this dialect:
+
+- `scheme://[user[:password]@]host[:port][/database][?key=value&...]`
+- The userinfo segment splits on the *last* `@` before the next `/`, `?`
+  or `#`, so a literal `@` inside a password doesn't get mistaken for the
+  boundary.
+- `user`, `password`, `database`, and query keys/values are percent-decoded;
+  a malformed `%` escape is reported.
+- Query parameter keys are checked for duplicates the same way ADO.NET keys
+  are, and an empty parameter name is an error.
+- A missing host is a warning rather than an error, since some drivers
+  (`postgres:///dbname?host=/var/run/postgresql`) use an empty host
+  deliberately to mean "connect over a Unix socket".
 
 ## usage
 
@@ -111,7 +131,6 @@ node dist/cli.js 'Server=localhost;Database=mydb'
 
 ## roadmap
 
-- URI-style connection strings (`postgres://`, `mongodb://`, `mysql://`)
 - `--file` mode to batch-check one connection string per line
 - unit tests covering the parser's edge cases
 - detect common misspelled keys (`Timeout` vs `Connection Timeout`)

@@ -28,7 +28,7 @@ export interface ParseResult {
   issues: ParseIssue[]
 }
 
-class Cursor {
+export class Cursor {
   private index = 0
   private line = 1
   private column = 1
