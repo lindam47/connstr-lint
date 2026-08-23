@@ -96,6 +96,28 @@ You can also pipe a string in, which is the more common case in scripts:
 $ echo "$DATABASE_URL" | connstr-lint
 ```
 
+To check a whole file at once - one connection string per line, blank lines
+skipped - use `--file`:
+
+```
+$ connstr-lint --file connections.txt
+line 1: ok, 2 key(s) parsed (Server, Database)
+error: missing "=" after key "TrustServerCertificate"
+ --> line 2, column 18
+  |
+2 | Server=localhost;TrustServerCertificate;Database=mydb
+  |                  ^^^^^^^^^^^^^^^^^^^^^^
+
+line 2: 1 error(s) found
+line 3: ok, 3 key(s) parsed (Server, Database, Encrypt)
+
+3 line(s) checked, 1 error(s) found
+```
+
+Positions are reported against the real line number in the file, and the
+exit code reflects whether *any* line had an error. With `--json`, `--file`
+returns an array with one result object per line instead of a single object.
+
 Pass `--json` to get structured output instead of the human-readable
 snippet, for use in other tooling:
 
@@ -116,7 +138,9 @@ $ connstr-lint --json 'Server=localhost;Server=other;Database=mydb'
 ```
 
 Exit codes: `0` on success (warnings are still printed but don't fail the
-run), `1` if any error-level issue was found, `2` if no input was given.
+run), `1` if any error-level issue was found (in `--file` mode, if any line
+had one), `2` if no input was given, or the file given to `--file` couldn't
+be read.
 
 ## building
 
@@ -131,8 +155,7 @@ node dist/cli.js 'Server=localhost;Database=mydb'
 
 ## roadmap
 
-- `--file` mode to batch-check one connection string per line
-- unit tests covering the parser's edge cases
+- unit tests covering both parsers' edge cases
 - detect common misspelled keys (`Timeout` vs `Connection Timeout`)
 - warn when a string passed directly as a CLI arg looks like it contains a
   real secret, since that's visible in shell history and `ps`

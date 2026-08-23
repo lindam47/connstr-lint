@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs"
+import type { ConnectionPair, ParseIssue } from "./parser.js"
 import { parseConnectionString } from "./parser.js"
 import { parseUriConnectionString } from "./uri-parser.js"
 import { renderIssue } from "./format.js"
@@ -7,9 +8,17 @@ import { renderIssue } from "./format.js"
 const USAGE =
   "usage: connstr-lint <connection-string>\n" +
   '       echo "$CONN" | connstr-lint\n' +
-  "       connstr-lint --json <connection-string>\n"
+  "       connstr-lint --json <connection-string>\n" +
+  "       connstr-lint --file <path>\n"
 
 const URI_SCHEME = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//
+
+interface LineResult {
+  lineNumber: number
+  isUri: boolean
+  pairs: ConnectionPair[]
+  issues: ParseIssue[]
+}
 
 function readInput(argv: string[]): string | undefined {
   const positional = argv.find((arg) => !arg.startsWith("-"))
@@ -20,9 +29,101 @@ function readInput(argv: string[]): string | undefined {
   return readFileSync(0, "utf8")
 }
 
+// Runs one line of a --file batch through the right parser, then rewrites
+// every position onto the real file line so renderIssue can point at it in
+// the original file text instead of "line 1" for every entry.
+function lintLine(raw: string, lineNumber: number): LineResult {
+  const isUri = URI_SCHEME.test(raw)
+  const { pairs, issues } = isUri ? parseUriConnectionString(raw) : parseConnectionString(raw)
+  const onRealLine = <T extends { position: { line: number; column: number } }>(item: T): T => ({
+    ...item,
+    position: { line: lineNumber, column: item.position.column },
+  })
+  return {
+    lineNumber,
+    isUri,
+    pairs: pairs.map(onRealLine),
+    issues: issues.map(onRealLine),
+  }
+}
+
+function runFileMode(filePath: string, asJson: boolean): number {
+  let fileText: string
+  try {
+    fileText = readFileSync(filePath, "utf8")
+  } catch (err) {
+    process.stderr.write(`error: cannot read file "${filePath}": ${(err as Error).message}\n`)
+    return 2
+  }
+
+  const results = fileText
+    .split("\n")
+    .map((raw, index) => ({ raw, lineNumber: index + 1 }))
+    .filter(({ raw }) => raw.trim().length > 0)
+    .map(({ raw, lineNumber }) => lintLine(raw, lineNumber))
+
+  const totalErrors = results.reduce(
+    (sum, result) => sum + result.issues.filter((issue) => issue.severity === "error").length,
+    0,
+  )
+
+  if (asJson) {
+    const payload = results.map((result) => ({
+      line: result.lineNumber,
+      pairs: result.pairs,
+      issues: result.issues,
+      ok: result.issues.every((issue) => issue.severity !== "error"),
+    }))
+    process.stdout.write(JSON.stringify(payload, null, 2) + "\n")
+    return totalErrors === 0 ? 0 : 1
+  }
+
+  if (results.length === 0) {
+    process.stdout.write("ok: no connection strings found\n")
+    return 0
+  }
+
+  for (const result of results) {
+    for (const issue of result.issues) {
+      process.stdout.write(
+        renderIssue(fileText, issue.severity, issue.message, issue.position, issue.length) +
+          "\n\n",
+      )
+    }
+
+    const lineErrors = result.issues.filter((issue) => issue.severity === "error").length
+    if (lineErrors === 0) {
+      const noun = result.isUri ? "component" : "key"
+      const keys = result.pairs.map((pair) => pair.key).join(", ")
+      process.stdout.write(
+        result.pairs.length > 0
+          ? `line ${result.lineNumber}: ok, ${result.pairs.length} ${noun}(s) parsed (${keys})\n`
+          : `line ${result.lineNumber}: ok, no ${noun}s found\n`,
+      )
+    } else {
+      process.stdout.write(`line ${result.lineNumber}: ${lineErrors} error(s) found\n`)
+    }
+  }
+
+  process.stdout.write(`\n${results.length} line(s) checked, ${totalErrors} error(s) found\n`)
+
+  return totalErrors === 0 ? 0 : 1
+}
+
 function main(): number {
   const argv = process.argv.slice(2)
   const asJson = argv.includes("--json")
+
+  const fileFlagIndex = argv.indexOf("--file")
+  if (fileFlagIndex !== -1) {
+    const filePath = argv[fileFlagIndex + 1]
+    if (filePath === undefined) {
+      process.stderr.write('error: --file requires a path argument\n')
+      return 2
+    }
+    return runFileMode(filePath, asJson)
+  }
+
   const input = readInput(argv)
 
   if (input === undefined) {
