@@ -153,9 +153,18 @@ npm run build
 node dist/cli.js 'Server=localhost;Database=mydb'
 ```
 
+## testing
+
+Uses Node's built-in test runner, so there's nothing extra to install:
+
+```
+npm test
+```
+
+This compiles the project, then runs every `*.test.js` file under `dist`.
+
 ## roadmap
 
-- unit tests covering both parsers' edge cases
 - detect common misspelled keys (`Timeout` vs `Connection Timeout`)
 - warn when a string passed directly as a CLI arg looks like it contains a
   real secret, since that's visible in shell history and `ps`
