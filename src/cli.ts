@@ -4,6 +4,7 @@ import type { ConnectionPair, ParseIssue } from "./parser.js"
 import { parseConnectionString } from "./parser.js"
 import { parseUriConnectionString } from "./uri-parser.js"
 import { renderIssue } from "./format.js"
+import { findLikelySecrets, indexToPosition } from "./secret-scan.js"
 
 const USAGE =
   "usage: connstr-lint <connection-string>\n" +
@@ -20,13 +21,34 @@ interface LineResult {
   issues: ParseIssue[]
 }
 
-function readInput(argv: string[]): string | undefined {
+interface Input {
+  text: string
+  // Only a bare positional argument sits in shell history and shows up to
+  // other users via `ps` for as long as the process runs - stdin doesn't.
+  fromArgv: boolean
+}
+
+function readInput(argv: string[]): Input | undefined {
   const positional = argv.find((arg) => !arg.startsWith("-"))
-  if (positional !== undefined) return positional
+  if (positional !== undefined) return { text: positional, fromArgv: true }
 
   if (process.stdin.isTTY) return undefined
 
-  return readFileSync(0, "utf8")
+  return { text: readFileSync(0, "utf8"), fromArgv: false }
+}
+
+// Turns matches from findLikelySecrets into ordinary warning-level issues so
+// they render and get counted the same way every other issue does.
+function secretExposureIssues(text: string): ParseIssue[] {
+  return findLikelySecrets(text).map((match) => ({
+    severity: "warning",
+    message:
+      `possible ${match.label} passed as a command-line argument - arguments are ` +
+      'visible to other users on this machine (via "ps") and commonly end up saved ' +
+      "in shell history; pipe the connection string on stdin or pass it with --file instead",
+    position: indexToPosition(text, match.index),
+    length: match.length,
+  }))
 }
 
 // Runs one line of a --file batch through the right parser, then rewrites
@@ -131,8 +153,11 @@ function main(): number {
     return 2
   }
 
-  const isUri = URI_SCHEME.test(input)
-  const { pairs, issues } = isUri ? parseUriConnectionString(input) : parseConnectionString(input)
+  const isUri = URI_SCHEME.test(input.text)
+  const { pairs, issues } = isUri
+    ? parseUriConnectionString(input.text)
+    : parseConnectionString(input.text)
+  if (input.fromArgv) issues.push(...secretExposureIssues(input.text))
   const errorCount = issues.filter((issue) => issue.severity === "error").length
 
   if (asJson) {
@@ -142,7 +167,8 @@ function main(): number {
 
   for (const issue of issues) {
     process.stdout.write(
-      renderIssue(input, issue.severity, issue.message, issue.position, issue.length) + "\n\n",
+      renderIssue(input.text, issue.severity, issue.message, issue.position, issue.length) +
+        "\n\n",
     )
   }
 

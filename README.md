@@ -96,6 +96,20 @@ You can also pipe a string in, which is the more common case in scripts:
 $ echo "$DATABASE_URL" | connstr-lint
 ```
 
+If you pass the string directly as an argument instead of piping it in,
+`connstr-lint` also checks it for anything shaped like a real, live API
+credential (an AWS access key ID, a GitHub token, a Stripe secret key, a PEM
+private key header, and a few others) and prints a `warning:` pointing at it
+if it finds one, since a bare command-line argument sits in your shell
+history and is visible to other users on the same machine via `ps` for as
+long as the process runs.
+
+This check only runs against a bare positional argument - input piped on
+stdin or read via `--file` never touches your shell history or `ps` output,
+so it's skipped there. It also only recognizes a short list of well-known
+credential formats by their prefix; it isn't a general secret scanner and
+won't catch an arbitrary database password.
+
 To check a whole file at once - one connection string per line, blank lines
 skipped - use `--file`:
 
@@ -166,6 +180,4 @@ This compiles the project, then runs every `*.test.js` file under `dist`.
 ## roadmap
 
 - detect common misspelled keys (`Timeout` vs `Connection Timeout`)
-- warn when a string passed directly as a CLI arg looks like it contains a
-  real secret, since that's visible in shell history and `ps`
 - publish to npm
