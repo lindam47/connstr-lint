@@ -5,6 +5,7 @@ import { parseConnectionString } from "./parser.js"
 import { parseUriConnectionString } from "./uri-parser.js"
 import { renderIssue } from "./format.js"
 import { findLikelySecrets, indexToPosition } from "./secret-scan.js"
+import { checkKeySpellings } from "./key-spellcheck.js"
 
 const USAGE =
   "usage: connstr-lint <connection-string>\n" +
@@ -57,6 +58,7 @@ function secretExposureIssues(text: string): ParseIssue[] {
 function lintLine(raw: string, lineNumber: number): LineResult {
   const isUri = URI_SCHEME.test(raw)
   const { pairs, issues } = isUri ? parseUriConnectionString(raw) : parseConnectionString(raw)
+  const allIssues = isUri ? issues : [...issues, ...checkKeySpellings(pairs)]
   const onRealLine = <T extends { position: { line: number; column: number } }>(item: T): T => ({
     ...item,
     position: { line: lineNumber, column: item.position.column },
@@ -65,7 +67,7 @@ function lintLine(raw: string, lineNumber: number): LineResult {
     lineNumber,
     isUri,
     pairs: pairs.map(onRealLine),
-    issues: issues.map(onRealLine),
+    issues: allIssues.map(onRealLine),
   }
 }
 
@@ -157,6 +159,7 @@ function main(): number {
   const { pairs, issues } = isUri
     ? parseUriConnectionString(input.text)
     : parseConnectionString(input.text)
+  if (!isUri) issues.push(...checkKeySpellings(pairs))
   if (input.fromArgv) issues.push(...secretExposureIssues(input.text))
   const errorCount = issues.filter((issue) => issue.severity === "error").length
 

@@ -35,6 +35,13 @@ Rules it understands:
   quote: `Password="it""s a secret"` means the value `it"s a secret`.
 - A doubled `==` inside a key escapes a literal `=` in the key name.
 - Keys are matched case-insensitively for duplicate detection.
+- A key that's close to, but not exactly, a keyword from one of the common
+  driver libraries (SqlClient, Npgsql, MySqlConnector) is flagged as a
+  possible typo, e.g. `Databse` warns that you probably meant `Database`.
+  Where the drivers disagree on the correct name for something close to
+  what you typed - `Databse` is also one edit away from SqlClient's
+  `Initial Catalog` - it lists every candidate instead of guessing, since
+  picking the wrong one would be worse than saying nothing.
 
 URI-style connection strings are also understood, using whichever scheme
 the string starts with to pick the grammar:
@@ -179,5 +186,4 @@ This compiles the project, then runs every `*.test.js` file under `dist`.
 
 ## roadmap
 
-- detect common misspelled keys (`Timeout` vs `Connection Timeout`)
 - publish to npm
