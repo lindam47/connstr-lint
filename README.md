@@ -163,7 +163,14 @@ run), `1` if any error-level issue was found (in `--file` mode, if any line
 had one), `2` if no input was given, or the file given to `--file` couldn't
 be read.
 
-## building
+## installing
+
+```
+npm install -g connstr-lint
+connstr-lint 'Server=localhost;Database=mydb'
+```
+
+## building from source
 
 No third-party runtime dependencies - the parser and CLI use only Node's
 standard library. TypeScript is a dev-only build dependency.
@@ -186,4 +193,4 @@ This compiles the project, then runs every `*.test.js` file under `dist`.
 
 ## roadmap
 
-- publish to npm
+- publish the first release to npm

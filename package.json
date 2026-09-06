@@ -5,6 +5,25 @@
   "license": "MIT",
   "author": "lindam47",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lindam47/connstr-lint.git"
+  },
+  "homepage": "https://github.com/lindam47/connstr-lint#readme",
+  "bugs": {
+    "url": "https://github.com/lindam47/connstr-lint/issues"
+  },
+  "keywords": [
+    "connection-string",
+    "ado.net",
+    "odbc",
+    "cli",
+    "linter",
+    "parser"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "bin": {
     "connstr-lint": "dist/cli.js"
   },
@@ -14,7 +33,8 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/cli.js",
-    "test": "tsc && node --test dist"
+    "test": "tsc && node --test dist",
+    "prepublishOnly": "npm test"
   },
   "devDependencies": {
     "typescript": "^5.5.4",
