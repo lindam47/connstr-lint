@@ -170,6 +170,31 @@ npm install -g connstr-lint
 connstr-lint 'Server=localhost;Database=mydb'
 ```
 
+## using it as a library
+
+The same parsing lives behind a plain function export, for callers who want
+the structured result instead of a subprocess and some stdout scraping:
+
+```js
+import { lint } from "connstr-lint"
+
+const { pairs, issues } = lint('Server=localhost;Databse=mydb')
+// pairs:  [{ key: "Server", value: "localhost", position: {...} },
+//          { key: "Databse", value: "mydb", position: {...} }]
+// issues: [{ severity: "warning",
+//             message: 'possibly misspelled key "Databse" (did you mean "Database"?)',
+//             position: {...}, length: 7 }]
+```
+
+`lint` picks the ADO.NET/ODBC or URI grammar from the string's shape, the
+same way the CLI does, and includes the key-spellcheck warnings. It does not
+run the command-line secret-exposure check, since that only makes sense
+against a literal argv entry, which a library caller may not have.
+
+For lower-level access - to parse one dialect explicitly, or to render an
+issue as the same compiler-style snippet the CLI prints - `parseConnectionString`,
+`parseUriConnectionString`, and `renderIssue` are exported too.
+
 ## building from source
 
 No third-party runtime dependencies - the parser and CLI use only Node's

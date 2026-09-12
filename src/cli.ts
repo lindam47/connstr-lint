@@ -1,19 +1,15 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs"
 import type { ConnectionPair, ParseIssue } from "./parser.js"
-import { parseConnectionString } from "./parser.js"
-import { parseUriConnectionString } from "./uri-parser.js"
+import { isUriConnectionString, lint } from "./index.js"
 import { renderIssue } from "./format.js"
 import { findLikelySecrets, indexToPosition } from "./secret-scan.js"
-import { checkKeySpellings } from "./key-spellcheck.js"
 
 const USAGE =
   "usage: connstr-lint <connection-string>\n" +
   '       echo "$CONN" | connstr-lint\n' +
   "       connstr-lint --json <connection-string>\n" +
   "       connstr-lint --file <path>\n"
-
-const URI_SCHEME = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//
 
 interface LineResult {
   lineNumber: number
@@ -56,9 +52,8 @@ function secretExposureIssues(text: string): ParseIssue[] {
 // every position onto the real file line so renderIssue can point at it in
 // the original file text instead of "line 1" for every entry.
 function lintLine(raw: string, lineNumber: number): LineResult {
-  const isUri = URI_SCHEME.test(raw)
-  const { pairs, issues } = isUri ? parseUriConnectionString(raw) : parseConnectionString(raw)
-  const allIssues = isUri ? issues : [...issues, ...checkKeySpellings(pairs)]
+  const isUri = isUriConnectionString(raw)
+  const { pairs, issues } = lint(raw)
   const onRealLine = <T extends { position: { line: number; column: number } }>(item: T): T => ({
     ...item,
     position: { line: lineNumber, column: item.position.column },
@@ -67,7 +62,7 @@ function lintLine(raw: string, lineNumber: number): LineResult {
     lineNumber,
     isUri,
     pairs: pairs.map(onRealLine),
-    issues: allIssues.map(onRealLine),
+    issues: issues.map(onRealLine),
   }
 }
 
@@ -155,11 +150,8 @@ function main(): number {
     return 2
   }
 
-  const isUri = URI_SCHEME.test(input.text)
-  const { pairs, issues } = isUri
-    ? parseUriConnectionString(input.text)
-    : parseConnectionString(input.text)
-  if (!isUri) issues.push(...checkKeySpellings(pairs))
+  const isUri = isUriConnectionString(input.text)
+  const { pairs, issues } = lint(input.text)
   if (input.fromArgv) issues.push(...secretExposureIssues(input.text))
   const errorCount = issues.filter((issue) => issue.severity === "error").length
 

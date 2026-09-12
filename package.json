@@ -5,6 +5,8 @@
   "license": "MIT",
   "author": "lindam47",
   "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/lindam47/connstr-lint.git"
